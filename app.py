@@ -258,7 +258,15 @@ else:
         st.markdown(
             """
             <style>
-                [data-testid="stSidebar"] { display: block; }
+                /* Make sidebar visible */
+                [data-testid="stSidebar"] { 
+                    display: block;
+                }
+                /* Increase font size for markdown content */
+                .stMarkdown p, .stMarkdown li {
+                    font-size: 1.1rem; /* Use rem for relative sizing */
+                    line-height: 1.6;  /* Improve spacing between lines */
+                }
             </style>
             """,
             unsafe_allow_html=True
@@ -281,28 +289,25 @@ else:
         if st.session_state.analysis_results:
             results = st.session_state.analysis_results
             available_pages = []
-            page_map = {}
-            if results.get("management_summary_data"):
-                available_pages.append("Management Summary")
-                page_map["Management Summary"] = "management_summary_data"
-            if results.get("occupancy_report_data"):
-                available_pages.append("Occupancy Report")
-                page_map["Occupancy Report"] = "occupancy_report_data"
-            if results.get("offering_memo_data"):
-                available_pages.append("Offering Memorandum")
-                page_map["Offering Memorandum"] = "offering_memo_data"
-            if results.get("other_docs_data"):
-                available_pages.append("Other Document")
-                page_map["Other Document"] = "other_docs_data"
+            page_details_map = {
+                "Management Summary": {"api_key": "management_summary_data", "summary_key": "m_s_summary", "report_key": "full_report"},
+                "Occupancy Report": {"api_key": "occupancy_report_data", "summary_key": "o_r_summary", "report_key": "full_report"},
+                "Offering Memorandum": {"api_key": "offering_memo_data", "summary_key": "o_m_summary", "report_key": "full_report"},
+                "Other Document": {"api_key": "other_docs_data", "summary_key": "o_d_summary", "report_key": "full_report"}
+            }
+
+            for display_name, details in page_details_map.items():
+                if isinstance(results.get(details["api_key"]), dict):
+                    available_pages.append(display_name)
 
             if not available_pages:
-                st.warning("Analysis completed, but no data was returned from the API.")
+                st.warning("Analysis completed, but no data was returned in the expected format.")
             else:
                 default_index = 0
                 if st.session_state.analysis_nav in available_pages:
                     default_index = available_pages.index(st.session_state.analysis_nav)
                 elif available_pages:
-                     st.session_state.analysis_nav = available_pages[0]
+                    st.session_state.analysis_nav = available_pages[0]
 
                 selected_page = st.radio(
                     "Select analysis to view:",
@@ -314,12 +319,28 @@ else:
 
                 st.markdown("---")
 
-                result_key = page_map.get(selected_page)
-                if result_key:
+                selected_page_details = page_details_map.get(selected_page)
+
+                if selected_page_details:
                     st.subheader(f"{selected_page} Analysis")
-                    markdown_content = results.get(result_key, f"No data available for {selected_page}.")
-                    escaped_markdown_content = markdown_content.replace("$", "\$")
-                    st.markdown(escaped_markdown_content)
+                    page_data = results.get(selected_page_details["api_key"], {})
+
+                    # Get summary and full report content, default to informative messages
+                    summary_content = page_data.get(selected_page_details["summary_key"], "No summary available.")
+                    full_report_content = page_data.get(selected_page_details["report_key"], "No full report available.")
+
+                    # Re-add dollar sign escaping for both
+                    escaped_summary = summary_content.replace("$", "\$")
+                    escaped_full_report = full_report_content.replace("$", "\$")
+
+                    # Display Summary
+                    st.markdown("**Summary:**")
+                    st.markdown(escaped_summary)
+                    st.markdown("---")
+
+                    # Display Full Report in an Expander
+                    with st.expander("View Full Report"):
+                        st.markdown(escaped_full_report)
                 else:
                     st.error("An error occurred displaying the selected analysis.")
 
